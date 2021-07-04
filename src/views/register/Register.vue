@@ -5,10 +5,13 @@
       <input placeholder="请输入用户名" v-model="username" class="wrapper__input__content" type="text">
     </div>
     <div class="wrapper__input">
-      <input autocomplete="new-password" placeholder="请输入密码" v-model="password" class="wrapper__input__content" type="password">
+      <input autocomplete="new-password" v-model="password" placeholder="请输入密码" class="wrapper__input__content" type="password">
     </div>
-    <div class="wrapper__login-button" @click="handleLogin">登录</div>
-    <div class="wrapper__login-link" @click="handleRegisterClick">立即注册</div>
+    <div class="wrapper__input">
+      <input autocomplete="new-password" v-model="ensurement" placeholder="请输入确认密码" class="wrapper__input__content" type="password">
+    </div>
+    <div class="wrapper__register-button">注册</div>
+    <div class="wrapper__register-link" @click="handleLoginClick">已有账号请登录</div>
     <Toast v-if="show" :message="toastMessage"/>
   </div>
 </template>
@@ -19,40 +22,37 @@ import { reactive, toRefs } from 'vue'
 import { post } from '../../untils/request.js'
 import Toast, { useToastEffect } from '@/components/Toast.vue'
 
-const useLoginEffect = (showToast) => {
+const useRegisterEffect = (showToast) => {
   const router = useRouter()
   const data = reactive({
     username: '',
-    password: ''
+    password: '',
+    ensurement: ''
   })
-  const handleLogin = async () => {
-    if (!data.username || !data.password) {
-      return showToast('请输入账号或密码')
-    }
+  const handleRegister = async () => {
     try {
-      const result = await post('/api/user/login', {
+      const result = await post('/api/user/register', {
         mobile: data.username,
         password: data.password
       })
       if (result?.errno === 0) {
-        localStorage.isLogin = true
-        router.push({ name: 'Home' })
+        router.push({ name: 'Login' })
       } else {
-        showToast('登录失败')
+        showToast('注册失败')
       }
     } catch (e) {
       showToast('请求失败')
     }
   }
-  const { username, password } = toRefs(data)
-  return { handleLogin, username, password }
+  const { username, password, ensurement } = toRefs(data)
+  return { handleRegister, username, password, ensurement }
 }
-const useRegisterEffect = () => {
+const useLoginEffect = () => {
   const router = useRouter()
-  const handleRegisterClick = () => {
-    router.push({ name: 'Register' })
+  const handleLoginClick = () => {
+    router.push({ name: 'Login' })
   }
-  return { handleRegisterClick }
+  return { handleLoginClick }
 }
 export default {
   name: 'Login',
@@ -61,9 +61,9 @@ export default {
   },
   setup () {
     const { showToast, toastMessage, show } = useToastEffect()
-    const { handleLogin, username, password } = useLoginEffect(showToast)
-    const { handleRegisterClick } = useRegisterEffect()
-    return { handleLogin, handleRegisterClick, username, password, toastMessage, show }
+    const { handleRegister, username, password, ensurement } = useRegisterEffect(showToast)
+    const { handleLoginClick } = useLoginEffect()
+    return { handleLoginClick, handleRegister, username, password, ensurement, toastMessage, show }
   }
 }
 </script>
@@ -103,7 +103,7 @@ export default {
       }
     }
   }
-  &__login-button{
+  &__register-button{
     margin: .32rem .4rem .16rem .4rem;
     line-height: .48rem;
     font-size: .16rem;
@@ -111,9 +111,9 @@ export default {
     background: $btn-bgColor;
     box-shadow: 0 .04rem .08rem 0 rgba(0,145,255,0.32);
     border-radius: .04rem;
-    color: $bgColor;
+    color: #fff;
   }
-  &__login-link{
+  &__register-link{
     text-align: center;
     font-size: .14rem;
     color: $content-notice-fontcolor;
