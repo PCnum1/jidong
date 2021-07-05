@@ -1,30 +1,42 @@
 <template>
+  <div class="mask" v-if="showChart"></div>
   <div class="cart">
-    <div class="product">
-      <div class="product__item" v-for="item in productList" :key="item._id">
-        <img class="product__item__img" :src="item.imgUrl" />
-        <div class="product__item__detail">
-          <h4 class="product__item__title">{{item.name}}</h4>
-          <p class="product__item__price">
-            <span class="product__item__yen" >&yen;</span>{{item.price}}
-            <span class="product__item__origin" >&yen;{{item.oldPrice}}</span>
-          </p>
+    <div class="product" v-if="showChart">
+      <div class="product__header">
+        <div class="product__header__all" @click="()=>setCartItemChecked(shopId)">
+          <span class="product__header__icon iconfont" v-html="allChecked ? '&#xe652;' : '&#xe66c;'"></span>
+          全选
         </div>
-        <div class="product__number">
-          <span class="product__number__minus"
-          @click="() => { changeCartItemInfo(shopId, item._id, item, -1) }"
-          >-</span>
-          {{item.count || 0}}
-          <span class="product__number__plus"
-          @click="() => { changeCartItemInfo(shopId, item._id, item, 1) }"
-          >+</span>
-        </div>
+        <div class="product__header__clear" @click="()=>cleanCartProducts(shopId)">清空购物车</div>
       </div>
+      <template  v-for="item in productList" :key="item._id">
+        <div v-if="item.count > 0" class="product__item">
+          <div @click="() => changeCartItemCheck(shopId,item._id)" class="product__item__checked iconfont" v-html="item.check ? '&#xe652;' : '&#xe66c;'">
+          </div>
+          <img class="product__item__img" :src="item.imgUrl" />
+          <div class="product__item__detail">
+            <h4 class="product__item__title">{{item.name}}</h4>
+            <p class="product__item__price">
+              <span class="product__item__yen" >&yen;</span>{{item.price}}
+              <span class="product__item__origin" >&yen;{{item.oldPrice}}</span>
+            </p>
+          </div>
+          <div class="product__number">
+            <span class="product__number__minus"
+            @click="() => { changeCartItemInfo(shopId, item._id, item, -1) }"
+            >-</span>
+            {{item.count || 0}}
+            <span class="product__number__plus"
+            @click="() => { changeCartItemInfo(shopId, item._id, item, 1) }"
+            >+</span>
+          </div>
+        </div>
+      </template>
     </div>
     <div class="check">
       <div class="check__icon">
         <img class="check__icon__img" src="http://www.dell-lee.com/imgs/vue3/basket.png" alt="">
-        <div class="check__icon__tag">{{total}}</div>
+        <div @click="handleCartShowChange" class="check__icon__tag">{{total}}</div>
       </div>
       <div class="check__info">
         总计: <span class="check__info__price">&yen;{{price}}</span>
@@ -35,11 +47,13 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
+import { useCommonCartEffect } from './CommonCartEffect.js'
 
 const useCartEffect = () => {
+  const { changeCartItemInfo } = useCommonCartEffect()
   const store = useStore()
   const route = useRoute()
   const shopId = route.params.id
@@ -61,22 +75,51 @@ const useCartEffect = () => {
     if (productList) {
       for (const i in productList) {
         const product = productList[i]
-        count += (product.count * product.price)
+        if (product.check) {
+          count += (product.count * product.price)
+        }
       }
     }
     return count.toFixed(2)
   })
+  const allChecked = computed(() => {
+    const productList = cartList[shopId]
+    let result = true
+    if (productList) {
+      for (const i in productList) {
+        const product = productList[i]
+        if (product.count > 0 && !product.check) {
+          result = false
+        }
+      }
+    }
+    return result
+  })
+  const setCartItemChecked = (shopId) => {
+    store.commit('setCartItemChecked', { shopId })
+  }
   const productList = computed(() => {
     const productList = cartList[shopId] || []
     return productList
   })
-  return { total, price, productList }
+  const changeCartItemCheck = (shopId, productId) => {
+    store.commit('changeCartItemCheck', { shopId, productId })
+    return { changeCartItemInfo }
+  }
+  const cleanCartProducts = (shopId) => {
+    store.commit('cleanCartProducts', { shopId })
+  }
+  return { total, price, productList, shopId, allChecked, setCartItemChecked, changeCartItemInfo, cleanCartProducts, changeCartItemCheck }
 }
 export default {
   name: 'Cart',
   setup () {
-    const { total, price, productList } = useCartEffect()
-    return { total, price, productList }
+    const showChart = ref(false)
+    const handleCartShowChange = () => {
+      showChart.value = !showChart.value
+    }
+    const { total, price, productList, shopId, allChecked, setCartItemChecked, changeCartItemInfo, cleanCartProducts, changeCartItemCheck } = useCartEffect()
+    return { total, price, productList, shopId, allChecked, showChart, handleCartShowChange, setCartItemChecked, changeCartItemInfo, cleanCartProducts, changeCartItemCheck }
   }
 }
 </script>
@@ -84,12 +127,22 @@ export default {
 <style lang="scss" scoped>
 @import '../../style/viriables.scss';
 @import '../../style/mixins.scss';
+.mask{
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, .5);
+  z-index: 1;
+}
 .cart{
   position: absolute;
   right: 0;
   left: 0;
   bottom: 0;
-  height: .5rem;
+  background: #fff;
+  z-index: 2;
 }
 .check{
   display: flex;
@@ -145,12 +198,39 @@ export default {
   flex: 1;
   overflow-y: scroll;
   background-color: #fff;
+  &__header{
+    display: flex;
+    line-height: .52rem;
+    border-bottom: 1px solid #f1f1f1;
+    &__all{
+      width: .64rem;
+      margin-left: .18rem;
+    }
+    &__icon{
+      display: inline-block;
+      color: #0091ff;
+      font-size: .2rem;
+    }
+    &__clear{
+      flex: 1;
+      margin-right: .16rem;
+      text-align: right;
+      font-size: .14rem;
+      color: #333;
+    }
+  }
   &__item{
     display: flex;
     position: relative;
     padding: .12rem 0;
     margin: 0 .16rem;
     border-bottom: .01rem solid $content-bgColor;
+    &__checked{
+      color: #0091ff;
+      font-size: .2rem;
+      line-height: .5rem;
+      margin-right: .2rem;
+    }
     &__detail{
       overflow: hidden;
     }
